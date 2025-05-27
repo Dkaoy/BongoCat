@@ -9,6 +9,16 @@ export interface BubbleMessage {
   timestamp: number
 }
 
+export interface ApiConfig {
+  enabled: boolean
+  url: string
+  interval: number
+  lastFetch: number
+  messageType: 'info' | 'success' | 'warning' | 'error'
+  headers: Record<string, string>
+  useCustomHeaders: boolean
+}
+
 export const useBubbleStore = defineStore('bubble', () => {
   // 基础设置
   const enabled = ref(true)
@@ -16,6 +26,17 @@ export const useBubbleStore = defineStore('bubble', () => {
   const autoHide = ref(true)
   const defaultDuration = ref(3000) // 默认显示时长（毫秒）
   const maxMessages = ref(3) // 最大同时显示的消息数量
+
+  // API消息设置
+  const apiConfig = ref<ApiConfig>({
+    enabled: false,
+    url: '',
+    interval: 300000, // 5分钟
+    lastFetch: 0,
+    messageType: 'info',
+    headers: {},
+    useCustomHeaders: false
+  })
 
   // 样式设置
   const bubbleStyle = ref({
@@ -142,6 +163,7 @@ export const useBubbleStore = defineStore('bubble', () => {
     messages,
     currentMessage,
     presetMessages,
+    apiConfig,
 
     // 计算属性
     visibleMessages,

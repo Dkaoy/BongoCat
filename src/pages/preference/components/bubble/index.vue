@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Button, Input, InputNumber, Select, Slider, Switch } from 'ant-design-vue'
 import { ref } from 'vue'
+import type { InputProps } from 'ant-design-vue'
 
 import ProList from '@/components/pro-list/index.vue'
 import ProListItem from '@/components/pro-list-item/index.vue'
+import { useApiMessage } from '@/composables/useApiMessage'
 import { useBubbleTimer } from '@/composables/useBubbleTimer'
 import { useBubbleStore } from '@/stores/bubble'
 
@@ -15,6 +17,9 @@ const {
   removeTimedMessage,
 } = useBubbleTimer()
 
+// API config comes directly from the bubble store
+const apiConfig = bubbleStore.apiConfig
+
 const newPresetMessage = ref('')
 const newTimedMessage = ref({
   content: '',
@@ -22,6 +27,37 @@ const newTimedMessage = ref({
   interval: 300000,
   enabled: true,
 })
+
+// Header management
+const newHeaderKey = ref('')
+const newHeaderValue = ref('')
+const isFetching = ref(false)
+
+function formatLastFetchTime(timestamp: number) {
+  if (!timestamp) return '从未'
+  const date = new Date(timestamp)
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`
+}
+
+function addHeader() {
+  if (newHeaderKey.value.trim()) {
+    // Use Vue's reactivity system to update the headers object
+    bubbleStore.apiConfig.headers = {
+      ...bubbleStore.apiConfig.headers,
+      [newHeaderKey.value.trim()]: newHeaderValue.value
+    }
+    
+    // Reset input fields
+    newHeaderKey.value = ''
+    newHeaderValue.value = ''
+  }
+}
+
+function removeHeader(key: string) {
+  const updatedHeaders = { ...bubbleStore.apiConfig.headers }
+  delete updatedHeaders[key]
+  bubbleStore.apiConfig.headers = updatedHeaders
+}
 
 function addPresetMessage() {
   if (newPresetMessage.value.trim()) {
@@ -79,6 +115,15 @@ function resetToDefault() {
   bubbleStore.defaultDuration = 3000
   bubbleStore.maxMessages = 3
 
+  // 重置API设置
+  bubbleStore.apiConfig.enabled = false
+  bubbleStore.apiConfig.url = ''
+  bubbleStore.apiConfig.interval = 300000
+  bubbleStore.apiConfig.lastFetch = 0
+  bubbleStore.apiConfig.messageType = 'info'
+  bubbleStore.apiConfig.headers = {}
+  bubbleStore.apiConfig.useCustomHeaders = false
+
   bubbleStore.bubbleStyle = {
     backgroundColor: '#ffffff',
     textColor: '#333333',
@@ -131,6 +176,36 @@ const timedMessageTypeOptions = [
   { label: '警告', value: 'warning' },
   { label: '错误', value: 'error' },
 ]
+
+async function fetchApiMessage() {
+  if (!bubbleStore.apiConfig.url) {
+    bubbleStore.showWarning('请先设置API地址')
+    return
+  }
+  
+  // 设置正在获取状态
+  isFetching.value = true
+  
+  // 临时设置lastFetch为0，以确保能立即发送请求
+  bubbleStore.apiConfig.lastFetch = 0
+  
+  try {
+    bubbleStore.showInfo('正在获取API消息...')
+    
+    // 调用API请求
+    const { fetchApiMessage: fetchMessage } = useApiMessage()
+    await fetchMessage()
+    
+    // 更新最后获取时间以便显示
+    bubbleStore.apiConfig.lastFetch = Date.now()
+  } catch (error) {
+    console.error('测试API消息失败:', error)
+    bubbleStore.showError(`测试API消息失败: ${error instanceof Error ? error.message : String(error)}`)
+  } finally {
+    // 恢复取消获取状态
+    isFetching.value = false
+  }
+}
 </script>
 
 <template>
@@ -462,6 +537,135 @@ const timedMessageTypeOptions = [
             </Button>
           </div>
         </div>
+      </ProListItem>
+    </ProList>
+
+    <!-- API消息设置 -->
+    <ProList title="API消息设置">
+      <ProListItem
+        description="开启后，桌宠将从外部API获取消息进行显示"
+        title="启用API消息"
+      >
+        <Switch v-model:checked="apiConfig.enabled" />
+      </ProListItem>
+      
+      <ProListItem
+        description="设置获取消息的API地址"
+        title="API地址"
+      >
+        <Input
+          v-model:value="apiConfig.url"
+          placeholder="请输入API地址..."
+          style="width: 300px"
+        />
+      </ProListItem>
+      
+      <ProListItem
+        description="设置获取消息的时间间隔"
+        title="请求间隔"
+      >
+        <InputNumber
+          v-model:value="apiConfig.interval"
+          addon-after="毫秒"
+          :max="3600000"
+          :min="60000"
+          :step="60000"
+          style="width: 150px"
+        />
+      </ProListItem>
+      
+      <ProListItem
+        description="设置API消息的类型"
+        title="消息类型"
+      >
+        <Select
+          v-model:value="apiConfig.messageType"
+          :options="timedMessageTypeOptions"
+          style="width: 100px"
+        />
+      </ProListItem>
+      
+      <ProListItem
+        description="启用自定义请求头部（用于API密钥等）"
+        title="自定义请求头"
+      >
+        <Switch v-model:checked="apiConfig.useCustomHeaders" />
+      </ProListItem>
+      
+      <ProListItem
+        v-if="apiConfig.useCustomHeaders"
+        description="添加API请求头部（格式：Key: Value）"
+        title="请求头设置"
+      >
+        <div class="space-y-3">
+          <div v-for="(headerValue, headerKey) in apiConfig.headers" :key="headerKey" class="flex items-center gap-2">
+            <div class="flex w-[300px] border rounded overflow-hidden">
+              <div class="bg-gray-100 px-2 py-1 flex items-center text-sm border-r">{{ headerKey }}</div>
+              <input
+                :value="headerValue"
+                class="flex-1 px-2 py-1 outline-none"
+                @input="(e) => { apiConfig.headers[headerKey] = (e.target as HTMLInputElement).value }"
+              />
+            </div>
+            <Button
+              danger
+              size="small"
+              @click="() => removeHeader(headerKey)"
+            >
+              删除
+            </Button>
+          </div>
+          
+          <div class="flex gap-2">
+            <Input
+              v-model:value="newHeaderKey"
+              placeholder="Header Key"
+              style="width: 140px"
+            />
+            <Input
+              v-model:value="newHeaderValue"
+              placeholder="Header Value"
+              style="width: 160px"
+            />
+            <Button
+              type="primary"
+              :disabled="!newHeaderKey"
+              @click="addHeader"
+            >
+              添加
+            </Button>
+          </div>
+        </div>
+      </ProListItem>
+      
+      <ProListItem
+        description="API状态和上次获取信息"
+        title="API状态"
+      >
+        <div class="flex items-center gap-2">
+          <div v-if="isFetching" class="text-sm text-blue-500 flex items-center">
+            <span class="i-solar:loading-bold animate-spin mr-2"></span>
+            正在获取消息...
+          </div>
+          <div v-else class="text-sm">
+            <span v-if="apiConfig.lastFetch > 0" class="text-gray-500">
+              上次更新: {{ formatLastFetchTime(apiConfig.lastFetch) }}
+            </span>
+            <span v-else class="text-gray-500">尚未获取消息</span>
+          </div>
+        </div>
+      </ProListItem>
+      
+      <ProListItem
+        description="立即从API获取一条消息"
+        title="测试API"
+      >
+        <Button 
+          :disabled="!apiConfig.url || isFetching"
+          @click="fetchApiMessage"
+        >
+          获取消息
+        </Button>
       </ProListItem>
     </ProList>
 

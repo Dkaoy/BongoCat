@@ -33,6 +33,10 @@
     {
       "identifier": "fs:scope",
       "allow": ["**/*"]
-    }
+    },
+    "http:default",
+    "http:allow-fetch",
+    "http:allow-fetch-send",
+    "http:allow-fetch-read-body"
   ]
 }

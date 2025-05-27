@@ -6,6 +6,7 @@ import { useDebounceFn, useEventListener } from '@vueuse/core'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 
 import BubbleComponent from '@/components/bubble/index.vue'
+import { useApiMessage } from '@/composables/useApiMessage'
 import { useBubbleTimer } from '@/composables/useBubbleTimer'
 import { useDevice } from '@/composables/useDevice'
 import { useModel } from '@/composables/useModel'
@@ -21,6 +22,7 @@ const { backgroundImage, handleDestroy, handleResize, handleMouseDown, handleMou
 const catStore = useCatStore()
 const bubbleStore = useBubbleStore()
 const { cleanup: cleanupBubbleTimer } = useBubbleTimer()
+const { cleanup: cleanupApiMessage } = useApiMessage() 
 const { getSharedMenu } = useSharedMenu()
 const modelStore = useModelStore()
 
@@ -29,6 +31,7 @@ const resizing = ref(false)
 onUnmounted(() => {
   handleDestroy()
   cleanupBubbleTimer()
+  cleanupApiMessage()
 })
 
 // 气泡框交互
@@ -98,6 +101,13 @@ function showWelcomeMessage() {
 onMounted(() => {
   if (bubbleStore.enabled) {
     showWelcomeMessage()
+  }
+  
+  // 如果API消息功能已启用，立即获取一条消息
+  const { fetchApiMessage, startTimer } = useApiMessage();
+  if (bubbleStore.enabled && bubbleStore.apiConfig.enabled && bubbleStore.apiConfig.url) {
+    fetchApiMessage();
+    startTimer(); // 启动定时获取API消息
   }
 })
 </script>
