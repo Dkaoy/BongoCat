@@ -16,6 +16,7 @@ import { useWindowState } from './composables/useWindowState'
 import { LISTEN_KEY } from './constants'
 import { hideWindow, showWindow } from './plugins/window'
 import { useAppStore } from './stores/app'
+import { useBubbleStore } from './stores/bubble'
 import { useCatStore } from './stores/cat'
 import { useGeneralStore } from './stores/general'
 import { useModelStore } from './stores/model'
@@ -23,6 +24,7 @@ import { useModelStore } from './stores/model'
 const { generateColorVars } = useThemeVars()
 const appStore = useAppStore()
 const modelStore = useModelStore()
+const bubbleStore = useBubbleStore()
 const catStore = useCatStore()
 const generalStore = useGeneralStore()
 const appWindow = getCurrentWebviewWindow()
@@ -33,6 +35,7 @@ onMounted(async () => {
 
   await appStore.$tauri.start()
   await modelStore.$tauri.start()
+  await bubbleStore.$tauri.start()
   await catStore.$tauri.start()
   await generalStore.$tauri.start()
 
