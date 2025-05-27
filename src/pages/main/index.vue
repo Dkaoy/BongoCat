@@ -3,11 +3,14 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import { Menu } from '@tauri-apps/api/menu'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useDebounceFn, useEventListener } from '@vueuse/core'
-import { onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 
+import BubbleComponent from '@/components/bubble/index.vue'
+import { useBubbleTimer } from '@/composables/useBubbleTimer'
 import { useDevice } from '@/composables/useDevice'
 import { useModel } from '@/composables/useModel'
 import { useSharedMenu } from '@/composables/useSharedMenu'
+import { useBubbleStore } from '@/stores/bubble'
 import { useCatStore } from '@/stores/cat'
 import { useModelStore } from '@/stores/model'
 import { join } from '@/utils/path'
@@ -16,12 +19,28 @@ const appWindow = getCurrentWebviewWindow()
 const { pressedMouses, mousePosition, pressedLeftKeys, pressedRightKeys } = useDevice()
 const { backgroundImage, handleDestroy, handleResize, handleMouseDown, handleMouseMove, handleKeyDown } = useModel()
 const catStore = useCatStore()
+const bubbleStore = useBubbleStore()
+const { cleanup: cleanupBubbleTimer } = useBubbleTimer()
 const { getSharedMenu } = useSharedMenu()
 const modelStore = useModelStore()
 
 const resizing = ref(false)
 
-onUnmounted(handleDestroy)
+onUnmounted(() => {
+  handleDestroy()
+  cleanupBubbleTimer()
+})
+
+// 气泡框交互
+let lastClickTime = 0
+function handleCatDoubleClick() {
+  const now = Date.now()
+  if (now - lastClickTime < 500) {
+    // 双击时显示随机消息
+    bubbleStore.showRandomMessage()
+  }
+  lastClickTime = now
+}
 
 const handleDebounceResize = useDebounceFn(async () => {
   await handleResize()
@@ -68,39 +87,64 @@ async function handleContextmenu(event: MouseEvent) {
 function resolveImagePath(key: string, side: 'left' | 'right' = 'left') {
   return convertFileSrc(join(modelStore.currentModel!.path, 'resources', `${side}-keys`, `${key}.png`))
 }
+
+// 在主页面加载时显示欢迎消息
+function showWelcomeMessage() {
+  setTimeout(() => {
+    bubbleStore.showInfo('你好！我是你的桌面小猫咪 🐱')
+  }, 1000)
+}
+
+onMounted(() => {
+  if (bubbleStore.enabled) {
+    showWelcomeMessage()
+  }
+})
 </script>
 
 <template>
   <div
-    class="relative size-screen overflow-hidden children:(absolute size-full)"
+    class="relative h-full w-full overflow-hidden children:(absolute size-full)"
     :class="[catStore.mirrorMode ? '-scale-x-100' : 'scale-x-100']"
     :style="{ opacity: catStore.opacity / 100 }"
+    @click="handleCatDoubleClick"
     @contextmenu="handleContextmenu"
     @mousedown="handleWindowDrag"
   >
-    <img :src="backgroundImage">
+    <img
+      class="h-full w-full object-contain"
+      :src="backgroundImage"
+    >
 
-    <canvas id="live2dCanvas" />
+    <canvas
+      id="live2dCanvas"
+      class="h-full w-full"
+    />
 
     <img
       v-for="key in pressedLeftKeys"
       :key="key"
+      class="h-full w-full object-contain"
       :src="resolveImagePath(key)"
     >
 
     <img
       v-for="key in pressedRightKeys"
       :key="key"
+      class="h-full w-full object-contain"
       :src="resolveImagePath(key, 'right')"
     >
 
     <div
       v-show="resizing"
-      class="flex items-center justify-center bg-black"
+      class="h-full w-full flex items-center justify-center bg-black"
     >
-      <span class="text-center text-5xl text-white">
+      <span class="text-center text-lg text-white">
         重绘中...
       </span>
     </div>
+
+    <!-- 气泡框组件 -->
+    <BubbleComponent />
   </div>
 </template>

@@ -1,5 +1,5 @@
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { LogicalSize, PhysicalSize } from '@tauri-apps/api/dpi'
+import { PhysicalSize } from '@tauri-apps/api/dpi'
 import { resolveResource } from '@tauri-apps/api/path'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { message } from 'ant-design-vue'
@@ -60,24 +60,16 @@ export function useModel() {
   async function handleResize() {
     if (!live2d.model) return
 
-    const { innerWidth, innerHeight } = window
+    const { innerWidth } = window
 
-    const { width, height } = await getImageSize(backgroundImage.value)
+    const { width } = await getImageSize(backgroundImage.value)
 
+    // 只调整 Live2D 模型的缩放，不改变窗口大小
     live2d.model?.scale.set(innerWidth / width)
 
-    if (round(innerWidth / innerHeight, 1) !== round(width / height, 1)) {
-      await appWindow.setSize(
-        new LogicalSize({
-          width: innerWidth,
-          height: Math.ceil(innerWidth * (height / width)),
-        }),
-      )
-    }
-
-    const size = await appWindow.size()
-
-    catStore.scale = round((size.width / width) * 100)
+    // 记录当前缩放比例，但不频繁调整窗口
+    const currentSize = await appWindow.size()
+    catStore.scale = round((currentSize.width / width) * 100)
   }
 
   function handleKeyDown(side: 'left' | 'right', pressed: boolean) {

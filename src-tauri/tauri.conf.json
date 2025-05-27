@@ -16,12 +16,19 @@
         "label": "main",
         "title": "BongoCat",
         "url": "index.html/#/",
+        "width": 400,
+        "height": 400,
+        "minWidth": 200,
+        "minHeight": 200,
+        "maxWidth": 800,
+        "maxHeight": 800,
         "shadow": false,
         "alwaysOnTop": true,
         "transparent": true,
         "decorations": false,
         "acceptFirstMouse": true,
-        "skipTaskbar": true
+        "skipTaskbar": true,
+        "resizable": true
       },
       {
         "label": "preference",
