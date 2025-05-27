@@ -1,4 +1,5 @@
-export const GITHUB_LINK = 'https://github.com/ayangweb/BongoCat'
+export const ORIGINAL_GITHUB_LINK = 'https://github.com/ayangweb/BongoCat'
+export const GITHUB_LINK = 'https://github.com/Dkaoy/BongoCat.git'
 
 export const LISTEN_KEY = {
   SHOW_WINDOW: 'show-window',

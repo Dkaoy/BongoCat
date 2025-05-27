@@ -103,45 +103,55 @@ onMounted(() => {
 </script>
 
 <template>
-  <div
-    class="relative h-full w-full overflow-hidden children:(absolute size-full)"
-    :class="[catStore.mirrorMode ? '-scale-x-100' : 'scale-x-100']"
-    :style="{ opacity: catStore.opacity / 100 }"
-    @click="handleCatDoubleClick"
-    @contextmenu="handleContextmenu"
-    @mousedown="handleWindowDrag"
-  >
-    <img
-      class="h-full w-full object-contain"
-      :src="backgroundImage"
+  <div class="h-full flex flex-col">
+    <!-- 上方区域，为气泡提供空间 -->
+    <div
+      v-if="bubbleStore.position === 'above-center'"
+      class="h-16 min-h-16 w-full flex items-center justify-center"
     >
-
-    <canvas
-      id="live2dCanvas"
-      class="h-full w-full"
-    />
-
-    <img
-      v-for="key in pressedLeftKeys"
-      :key="key"
-      class="h-full w-full object-contain"
-      :src="resolveImagePath(key)"
-    >
-
-    <img
-      v-for="key in pressedRightKeys"
-      :key="key"
-      class="h-full w-full object-contain"
-      :src="resolveImagePath(key, 'right')"
-    >
+      <!-- 气泡将在此区域上方显示 -->
+    </div>
 
     <div
-      v-show="resizing"
-      class="h-full w-full flex items-center justify-center bg-black"
+      class="relative w-full flex-1 overflow-hidden children:(absolute size-full)"
+      :class="[catStore.mirrorMode ? '-scale-x-100' : 'scale-x-100']"
+      :style="{ opacity: catStore.opacity / 100 }"
+      @click="handleCatDoubleClick"
+      @contextmenu="handleContextmenu"
+      @mousedown="handleWindowDrag"
     >
-      <span class="text-center text-lg text-white">
-        重绘中...
-      </span>
+      <img
+        class="h-full w-full object-contain"
+        :src="backgroundImage"
+      >
+
+      <canvas
+        id="live2dCanvas"
+        class="h-full w-full"
+      />
+
+      <img
+        v-for="key in pressedLeftKeys"
+        :key="key"
+        class="h-full w-full object-contain"
+        :src="resolveImagePath(key)"
+      >
+
+      <img
+        v-for="key in pressedRightKeys"
+        :key="key"
+        class="h-full w-full object-contain"
+        :src="resolveImagePath(key, 'right')"
+      >
+
+      <div
+        v-show="resizing"
+        class="h-full w-full flex items-center justify-center bg-black"
+      >
+        <span class="text-center text-lg text-white">
+          重绘中...
+        </span>
+      </div>
     </div>
 
     <!-- 气泡框组件 -->

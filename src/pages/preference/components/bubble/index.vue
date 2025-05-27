@@ -54,6 +54,7 @@ const positionOptions = [
   { label: '右上角', value: 'top-right' },
   { label: '左下角', value: 'bottom-left' },
   { label: '右下角', value: 'bottom-right' },
+  { label: '上方居中', value: 'above-center' },
 ]
 
 const animationOptions = [

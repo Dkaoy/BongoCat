@@ -10,6 +10,7 @@ const bubbleClasses = computed(() => {
     'bubble-container',
     `position-${bubbleStore.position}`,
     bubbleStore.animation.enabled ? `animate-${bubbleStore.animation.type}` : '',
+    bubbleStore.position === 'above-center' ? 'above-center-position' : '',
   ]
 })
 
@@ -198,6 +199,20 @@ function handleMessageClick(messageId: string) {
 
 .position-bottom-right .bubble-message-enter-from {
   transform: translateX(100px);
+}
+
+/* 上方中央位置样式 */
+.position-above-center .bubble-message-enter-from {
+  transform: translateY(-30px);
+}
+
+.above-center-position {
+  /* 使气泡框在上方水平居中 */
+  position: absolute !important;
+  top: 5px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 2000 !important;
 }
 
 /* 动画类型 */

@@ -12,7 +12,7 @@ export interface BubbleMessage {
 export const useBubbleStore = defineStore('bubble', () => {
   // 基础设置
   const enabled = ref(true)
-  const position = ref<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('top-right')
+  const position = ref<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'above-center'>('top-right')
   const autoHide = ref(true)
   const defaultDuration = ref(3000) // 默认显示时长（毫秒）
   const maxMessages = ref(3) // 最大同时显示的消息数量
@@ -52,6 +52,7 @@ export const useBubbleStore = defineStore('bubble', () => {
       'top-right': { top: '20px', right: '20px' },
       'bottom-left': { bottom: '20px', left: '20px' },
       'bottom-right': { bottom: '20px', right: '20px' },
+      'above-center': { top: '-60px', left: '50%', transform: 'translateX(-50%)' },
     }
     return positions[position.value]
   })
