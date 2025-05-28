@@ -432,6 +432,7 @@ name = "bongo-cat"
 version = "0.4.0"
 dependencies = [
  "fs_extra",
+ "lazy_static",
  "rdev",
  "serde",
  "serde_json",

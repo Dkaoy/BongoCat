@@ -1,6 +1,11 @@
+mod commands;
 mod core;
 mod utils;
 
+use commands::display::{
+    create_window_on_monitor, close_window_instance, reset_window_positions,
+    list_window_instances, get_available_monitors,
+};
 use core::{device, prevent_default, setup};
 use tauri::{generate_handler, Manager, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
@@ -25,7 +30,14 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(generate_handler![copy_dir])
+        .invoke_handler(generate_handler![
+            copy_dir,
+            create_window_on_monitor,
+            close_window_instance,
+            reset_window_positions,
+            list_window_instances,
+            get_available_monitors
+        ])
         .plugin(tauri_plugin_custom_window::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
