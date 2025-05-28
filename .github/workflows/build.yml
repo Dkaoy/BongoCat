@@ -1,41 +1,20 @@
-name: Build and Release
+name: Build and Test
 
 on:
   push:
     branches:
       - master
       - main
+  pull_request:
+    branches:
+      - master
+      - main
   workflow_dispatch:
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      APP_VERSION: ${{ steps.get_version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Get version from package.json
-        id: get_version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.get_version.outputs.version }}
-          release_name: BongoCat v${{ steps.get_version.outputs.version }}
-          draft: true
-          prerelease: false
-
   build-app:
-    needs: create-release
     permissions:
-      contents: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -47,15 +26,9 @@ jobs:
 
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
-          - platform: windows-latest
-            target: i686-pc-windows-msvc
-          - platform: windows-latest
-            target: aarch64-pc-windows-msvc
 
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-          - platform: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -102,11 +75,5 @@ jobs:
         env:
           CI: false
           PLATFORM: ${{ matrix.platform }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v${{ needs.create-release.outputs.APP_VERSION }}
-          releaseName: BongoCat v${{ needs.create-release.outputs.APP_VERSION }}
-          releaseBody: ''
-          releaseDraft: true
-          prerelease: false
           args: --target ${{ matrix.target }}
