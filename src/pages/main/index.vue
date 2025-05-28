@@ -7,9 +7,9 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 
 import BubbleComponent from '@/components/bubble/index.vue'
 import { useApiMessage } from '@/composables/useApiMessage'
-import { useBubbleTimer } from '@/composables/useBubbleTimer'
 import { useDevice } from '@/composables/useDevice'
 import { useModel } from '@/composables/useModel'
+import { useScheduledReminders } from '@/composables/useScheduledReminders'
 import { useSharedMenu } from '@/composables/useSharedMenu'
 import { useBubbleStore } from '@/stores/bubble'
 import { useCatStore } from '@/stores/cat'
@@ -21,8 +21,8 @@ const { pressedMouses, mousePosition, pressedLeftKeys, pressedRightKeys } = useD
 const { backgroundImage, handleDestroy, handleResize, handleMouseDown, handleMouseMove, handleKeyDown } = useModel()
 const catStore = useCatStore()
 const bubbleStore = useBubbleStore()
-const { cleanup: cleanupBubbleTimer } = useBubbleTimer()
-const { cleanup: cleanupApiMessage } = useApiMessage() 
+const { cleanup: cleanupApiMessage } = useApiMessage()
+const { cleanup: cleanupScheduledReminders } = useScheduledReminders()
 const { getSharedMenu } = useSharedMenu()
 const modelStore = useModelStore()
 
@@ -30,8 +30,8 @@ const resizing = ref(false)
 
 onUnmounted(() => {
   handleDestroy()
-  cleanupBubbleTimer()
   cleanupApiMessage()
+  cleanupScheduledReminders()
 })
 
 // 气泡框交互
@@ -102,12 +102,18 @@ onMounted(() => {
   if (bubbleStore.enabled) {
     showWelcomeMessage()
   }
-  
+
   // 如果API消息功能已启用，立即获取一条消息
-  const { fetchApiMessage, startTimer } = useApiMessage();
+  const { fetchApiMessage, startTimer } = useApiMessage()
   if (bubbleStore.enabled && bubbleStore.apiConfig.enabled && bubbleStore.apiConfig.url) {
-    fetchApiMessage();
-    startTimer(); // 启动定时获取API消息
+    fetchApiMessage()
+    startTimer() // 启动定时获取API消息
+  }
+
+  // 启动定时提醒
+  const { startTimer: startReminderTimer } = useScheduledReminders()
+  if (bubbleStore.enabled) {
+    startReminderTimer()
   }
 })
 </script>

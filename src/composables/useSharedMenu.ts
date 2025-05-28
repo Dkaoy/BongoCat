@@ -1,6 +1,7 @@
 import { CheckMenuItem, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu'
 import { range } from 'es-toolkit'
 
+import { useScheduledReminders } from '@/composables/useScheduledReminders'
 import { hideWindow, showWindow } from '@/plugins/window'
 import { useBubbleStore } from '@/stores/bubble'
 import { useCatStore } from '@/stores/cat'
@@ -109,22 +110,71 @@ export function useSharedMenu() {
       }),
       Submenu.new({
         text: '快捷消息',
+        items: await Promise.all(
+          bubbleStore.presetMessages.length > 0
+            ? bubbleStore.presetMessages.slice(0, 8).map(message =>
+                MenuItem.new({
+                  text: message.length > 20 ? `${message.substring(0, 17)}...` : message,
+                  action: () => bubbleStore.showInfo(message),
+                }),
+              )
+            : [
+                MenuItem.new({
+                  text: '暂无预设消息',
+                  enabled: false,
+                  action: () => {},
+                }),
+                MenuItem.new({
+                  text: '前往设置添加',
+                  action: () => showWindow('preference'),
+                }),
+              ],
+        ),
+      }),
+      Submenu.new({
+        text: '定时提醒',
         items: await Promise.all([
+          CheckMenuItem.new({
+            text: '启用定时提醒',
+            checked: bubbleStore.reminderEnabled,
+            action: () => {
+              bubbleStore.reminderEnabled = !bubbleStore.reminderEnabled
+            },
+          }),
+          PredefinedMenuItem.new({ item: 'Separator' }),
           MenuItem.new({
-            text: '你好！',
-            action: () => bubbleStore.showInfo('你好！'),
+            text: '添加工作提醒',
+            action: () => {
+              // 快速添加工作日9点提醒
+              const { addScheduledReminder } = useScheduledReminders()
+              addScheduledReminder({
+                content: '新的一天开始了，加油工作！💪',
+                type: 'info',
+                time: '09:00',
+                repeatType: 'workdays',
+                enabled: true,
+              })
+              bubbleStore.showSuccess('工作提醒已添加')
+            },
           }),
           MenuItem.new({
-            text: '今天天气真不错～',
-            action: () => bubbleStore.showInfo('今天天气真不错～'),
+            text: '添加休息提醒',
+            action: () => {
+              // 快速添加每天下午3点休息提醒
+              const { addScheduledReminder } = useScheduledReminders()
+              addScheduledReminder({
+                content: '该休息一下，放松放松吧～☕',
+                type: 'warning',
+                time: '15:00',
+                repeatType: 'daily',
+                enabled: true,
+              })
+              bubbleStore.showSuccess('休息提醒已添加')
+            },
           }),
           MenuItem.new({
-            text: '要一起玩游戏吗？',
-            action: () => bubbleStore.showInfo('要一起玩游戏吗？'),
-          }),
-          MenuItem.new({
-            text: '记得按时休息哦！',
-            action: () => bubbleStore.showWarning('记得按时休息哦！'),
+            text: '管理提醒设置',
+            action: () => showWindow('preference'),
           }),
         ]),
       }),

@@ -1,30 +1,51 @@
 <script setup lang="ts">
+import type { ReminderRepeatType } from '@/composables/useScheduledReminders'
+
 import { Button, Input, InputNumber, Select, Slider, Switch } from 'ant-design-vue'
 import { ref } from 'vue'
-import type { InputProps } from 'ant-design-vue'
 
 import ProList from '@/components/pro-list/index.vue'
 import ProListItem from '@/components/pro-list-item/index.vue'
 import { useApiMessage } from '@/composables/useApiMessage'
-import { useBubbleTimer } from '@/composables/useBubbleTimer'
+import { useScheduledReminders } from '@/composables/useScheduledReminders'
 import { useBubbleStore } from '@/stores/bubble'
 
 const bubbleStore = useBubbleStore()
+
+// 定时提醒功能
 const {
-  timedMessages,
-  autoMessageEnabled,
-  addTimedMessage: addNewTimedMessage,
-  removeTimedMessage,
-} = useBubbleTimer()
+  scheduledReminders,
+  reminderEnabled,
+  reminderTemplates,
+  addScheduledReminder,
+  removeScheduledReminder,
+  updateScheduledReminder,
+  addFromTemplate,
+  formatNextTrigger,
+  addTestReminder,
+} = useScheduledReminders()
 
 // API config comes directly from the bubble store
 const apiConfig = bubbleStore.apiConfig
 
 const newPresetMessage = ref('')
-const newTimedMessage = ref({
+
+// 定时提醒相关状态
+const newScheduledReminder = ref<{
+  content: string
+  type: 'info' | 'success' | 'warning' | 'error'
+  time: string
+  date: string
+  repeatType: ReminderRepeatType
+  weekDays: number[]
+  enabled: boolean
+}>({
   content: '',
-  type: 'info' as const,
-  interval: 300000,
+  type: 'info',
+  time: '09:00',
+  date: '',
+  repeatType: 'daily',
+  weekDays: [],
   enabled: true,
 })
 
@@ -44,9 +65,9 @@ function addHeader() {
     // Use Vue's reactivity system to update the headers object
     bubbleStore.apiConfig.headers = {
       ...bubbleStore.apiConfig.headers,
-      [newHeaderKey.value.trim()]: newHeaderValue.value
+      [newHeaderKey.value.trim()]: newHeaderValue.value,
     }
-    
+
     // Reset input fields
     newHeaderKey.value = ''
     newHeaderValue.value = ''
@@ -143,59 +164,85 @@ function resetToDefault() {
   }
 }
 
-function addTimedMessageToList() {
-  if (newTimedMessage.value.content.trim()) {
-    addNewTimedMessage({
-      content: newTimedMessage.value.content.trim(),
-      type: newTimedMessage.value.type,
-      interval: newTimedMessage.value.interval,
-      enabled: newTimedMessage.value.enabled,
+// 定时提醒相关选项
+const repeatTypeOptions = [
+  { label: '一次性提醒', value: 'once' },
+  { label: '每天', value: 'daily' },
+  { label: '工作日', value: 'workdays' },
+  { label: '周末', value: 'weekends' },
+  { label: '自定义每周', value: 'weekly' },
+]
+
+const weekDayOptions = [
+  { label: '周一', value: 1 },
+  { label: '周二', value: 2 },
+  { label: '周三', value: 3 },
+  { label: '周四', value: 4 },
+  { label: '周五', value: 5 },
+  { label: '周六', value: 6 },
+  { label: '周日', value: 0 },
+]
+
+// 定时提醒相关函数
+function addScheduledReminderToList() {
+  if (newScheduledReminder.value.content.trim()) {
+    addScheduledReminder({
+      content: newScheduledReminder.value.content.trim(),
+      type: newScheduledReminder.value.type,
+      time: newScheduledReminder.value.time,
+      date: newScheduledReminder.value.date || undefined,
+      repeatType: newScheduledReminder.value.repeatType,
+      weekDays: newScheduledReminder.value.weekDays.length > 0 ? newScheduledReminder.value.weekDays : undefined,
+      enabled: newScheduledReminder.value.enabled,
     })
-    newTimedMessage.value = {
+
+    // 重置表单
+    newScheduledReminder.value = {
       content: '',
       type: 'info',
-      interval: 300000,
+      time: '09:00',
+      date: '',
+      repeatType: 'daily',
+      weekDays: [],
       enabled: true,
     }
   }
 }
 
-function formatInterval(ms: number) {
-  if (ms >= 3600000) {
-    return `${Math.round(ms / 3600000)}小时`
-  } else if (ms >= 60000) {
-    return `${Math.round(ms / 60000)}分钟`
-  } else {
-    return `${Math.round(ms / 1000)}秒`
+function getRepeatTypeLabel(repeatType: string, weekDays?: number[]) {
+  switch (repeatType) {
+    case 'once': return '一次性'
+    case 'daily': return '每天'
+    case 'workdays': return '工作日'
+    case 'weekends': return '周末'
+    case 'weekly': {
+      if (!weekDays || weekDays.length === 0) return '自定义'
+      const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+      return weekDays.map(day => dayNames[day]).join('、')
+    }
+    default: return '未知'
   }
 }
-
-const timedMessageTypeOptions = [
-  { label: '信息', value: 'info' },
-  { label: '成功', value: 'success' },
-  { label: '警告', value: 'warning' },
-  { label: '错误', value: 'error' },
-]
 
 async function fetchApiMessage() {
   if (!bubbleStore.apiConfig.url) {
     bubbleStore.showWarning('请先设置API地址')
     return
   }
-  
+
   // 设置正在获取状态
   isFetching.value = true
-  
+
   // 临时设置lastFetch为0，以确保能立即发送请求
   bubbleStore.apiConfig.lastFetch = 0
-  
+
   try {
     bubbleStore.showInfo('正在获取API消息...')
-    
+
     // 调用API请求
     const { fetchApiMessage: fetchMessage } = useApiMessage()
     await fetchMessage()
-    
+
     // 更新最后获取时间以便显示
     bubbleStore.apiConfig.lastFetch = Date.now()
   } catch (error) {
@@ -205,6 +252,19 @@ async function fetchApiMessage() {
     // 恢复取消获取状态
     isFetching.value = false
   }
+}
+
+// 缺失的选项和工具函数
+const reminderTypeOptions = [
+  { label: '信息', value: 'info' },
+  { label: '成功', value: 'success' },
+  { label: '警告', value: 'warning' },
+  { label: '错误', value: 'error' },
+]
+
+function testReminder() {
+  const timeString = addTestReminder()
+  bubbleStore.showSuccess(`已添加测试提醒，将在${timeString}触发`)
 }
 </script>
 
@@ -458,72 +518,142 @@ async function fetchApiMessage() {
       </ProListItem>
     </ProList>
 
-    <!-- 定时消息管理 -->
-    <ProList title="定时消息管理">
+    <!-- 定时提醒管理 -->
+    <ProList title="定时提醒管理">
       <ProListItem
-        description="开启后，桌宠将按设定间隔自动显示消息"
-        title="启用定时消息"
+        description="开启后，桌宠将在指定时间自动显示提醒消息"
+        title="启用定时提醒"
       >
-        <Switch v-model:checked="autoMessageEnabled" />
+        <Switch v-model:checked="reminderEnabled" />
       </ProListItem>
 
       <ProListItem
-        description="添加自定义的定时消息"
-        title="添加定时消息"
+        description="从预设模板快速添加常用提醒，或测试提醒功能"
+        title="预设提醒模板"
       >
-        <div class="space-y-3">
-          <div class="flex gap-2">
-            <Input
-              v-model:value="newTimedMessage.content"
-              placeholder="输入定时消息内容..."
-              style="width: 200px"
-            />
-            <Select
-              v-model:value="newTimedMessage.type"
-              :options="timedMessageTypeOptions"
-              style="width: 80px"
-            />
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-sm">间隔时间：</span>
-            <InputNumber
-              v-model:value="newTimedMessage.interval"
-              addon-after="毫秒"
-              :max="86400000"
-              :min="60000"
-              :step="60000"
-              style="width: 140px"
-            />
+        <div class="space-y-2">
+          <div class="flex flex-wrap gap-2">
             <Button
-              type="primary"
-              @click="addTimedMessageToList"
+              v-for="template in reminderTemplates"
+              :key="template.content"
+              size="small"
+              @click="addFromTemplate(template)"
             >
-              添加
+              {{ template.content.substring(0, 10) }}...
+            </Button>
+          </div>
+          <div class="flex gap-2">
+            <Button
+              size="small"
+              type="primary"
+              @click="testReminder"
+            >
+              测试提醒 (1分钟后)
             </Button>
           </div>
         </div>
       </ProListItem>
 
       <ProListItem
-        description="管理所有定时消息"
-        title="定时消息列表"
+        description="添加自定义的定时提醒"
+        title="添加定时提醒"
+      >
+        <div class="space-y-3">
+          <div class="flex gap-2">
+            <Input
+              v-model:value="newScheduledReminder.content"
+              placeholder="输入提醒内容..."
+              style="width: 200px"
+            />
+            <Select
+              v-model:value="newScheduledReminder.type"
+              :options="reminderTypeOptions"
+              style="width: 80px"
+            />
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-sm">提醒时间：</span>
+            <Input
+              v-model:value="newScheduledReminder.time"
+              placeholder="HH:mm"
+              style="width: 80px"
+            />
+            <span class="text-sm">重复模式：</span>
+            <Select
+              v-model:value="newScheduledReminder.repeatType"
+              :options="repeatTypeOptions"
+              style="width: 120px"
+            />
+          </div>
+
+          <div
+            v-if="newScheduledReminder.repeatType === 'once'"
+            class="flex items-center gap-2"
+          >
+            <span class="text-sm">提醒日期：</span>
+            <Input
+              v-model:value="newScheduledReminder.date"
+              placeholder="YYYY-MM-DD"
+              style="width: 120px"
+            />
+          </div>
+
+          <div
+            v-if="newScheduledReminder.repeatType === 'weekly'"
+            class="space-y-2"
+          >
+            <span class="text-sm">选择星期几：</span>
+            <div class="flex flex-wrap gap-2">
+              <label
+                v-for="option in weekDayOptions"
+                :key="option.value"
+                class="flex cursor-pointer items-center gap-1"
+              >
+                <input
+                  v-model="newScheduledReminder.weekDays"
+                  type="checkbox"
+                  :value="option.value"
+                >
+                <span class="text-sm">{{ option.label }}</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <Button
+              type="primary"
+              @click="addScheduledReminderToList"
+            >
+              添加提醒
+            </Button>
+          </div>
+        </div>
+      </ProListItem>
+
+      <ProListItem
+        description="管理所有定时提醒"
+        title="定时提醒列表"
       >
         <div class="max-h-48 overflow-y-auto space-y-2">
           <div
-            v-for="message in timedMessages"
-            :key="message.id"
+            v-for="reminder in scheduledReminders"
+            :key="reminder.id"
             class="flex items-center justify-between rounded bg-gray-50 p-2"
           >
             <div class="flex-1">
               <div class="text-sm">
-                {{ message.content }}
+                {{ reminder.content }}
               </div>
               <div class="text-xs text-gray-500">
-                {{ formatInterval(message.interval) }} · {{ message.type }}
+                {{ reminder.time }} · {{ getRepeatTypeLabel(reminder.repeatType, reminder.weekDays) }} · {{ reminder.type }}
+                <br>
+                <span class="text-blue-600">下次提醒: {{ formatNextTrigger(reminder) }}</span>
                 <Switch
-                  v-model:checked="message.enabled"
+                  v-model:checked="reminder.enabled"
                   class="ml-2"
                   size="small"
+                  @change="updateScheduledReminder(reminder.id, { enabled: reminder.enabled })"
                 />
               </div>
             </div>
@@ -531,10 +661,17 @@ async function fetchApiMessage() {
               danger
               size="small"
               type="text"
-              @click="removeTimedMessage(message.id)"
+              @click="removeScheduledReminder(reminder.id)"
             >
               删除
             </Button>
+          </div>
+
+          <div
+            v-if="scheduledReminders.length === 0"
+            class="py-4 text-center text-gray-500"
+          >
+            暂无定时提醒，请添加一些提醒
           </div>
         </div>
       </ProListItem>
@@ -548,7 +685,7 @@ async function fetchApiMessage() {
       >
         <Switch v-model:checked="apiConfig.enabled" />
       </ProListItem>
-      
+
       <ProListItem
         description="设置获取消息的API地址"
         title="API地址"
@@ -559,7 +696,7 @@ async function fetchApiMessage() {
           style="width: 300px"
         />
       </ProListItem>
-      
+
       <ProListItem
         description="设置获取消息的时间间隔"
         title="请求间隔"
@@ -573,39 +710,45 @@ async function fetchApiMessage() {
           style="width: 150px"
         />
       </ProListItem>
-      
+
       <ProListItem
         description="设置API消息的类型"
         title="消息类型"
       >
         <Select
           v-model:value="apiConfig.messageType"
-          :options="timedMessageTypeOptions"
+          :options="reminderTypeOptions"
           style="width: 100px"
         />
       </ProListItem>
-      
+
       <ProListItem
         description="启用自定义请求头部（用于API密钥等）"
         title="自定义请求头"
       >
         <Switch v-model:checked="apiConfig.useCustomHeaders" />
       </ProListItem>
-      
+
       <ProListItem
         v-if="apiConfig.useCustomHeaders"
         description="添加API请求头部（格式：Key: Value）"
         title="请求头设置"
       >
         <div class="space-y-3">
-          <div v-for="(headerValue, headerKey) in apiConfig.headers" :key="headerKey" class="flex items-center gap-2">
-            <div class="flex w-[300px] border rounded overflow-hidden">
-              <div class="bg-gray-100 px-2 py-1 flex items-center text-sm border-r">{{ headerKey }}</div>
+          <div
+            v-for="(headerValue, headerKey) in apiConfig.headers"
+            :key="headerKey"
+            class="flex items-center gap-2"
+          >
+            <div class="w-[300px] flex overflow-hidden border rounded">
+              <div class="flex items-center border-r bg-gray-100 px-2 py-1 text-sm">
+                {{ headerKey }}
+              </div>
               <input
-                :value="headerValue"
                 class="flex-1 px-2 py-1 outline-none"
+                :value="headerValue"
                 @input="(e) => { apiConfig.headers[headerKey] = (e.target as HTMLInputElement).value }"
-              />
+              >
             </div>
             <Button
               danger
@@ -615,7 +758,7 @@ async function fetchApiMessage() {
               删除
             </Button>
           </div>
-          
+
           <div class="flex gap-2">
             <Input
               v-model:value="newHeaderKey"
@@ -628,8 +771,8 @@ async function fetchApiMessage() {
               style="width: 160px"
             />
             <Button
-              type="primary"
               :disabled="!newHeaderKey"
+              type="primary"
               @click="addHeader"
             >
               添加
@@ -637,30 +780,42 @@ async function fetchApiMessage() {
           </div>
         </div>
       </ProListItem>
-      
+
       <ProListItem
         description="API状态和上次获取信息"
         title="API状态"
       >
         <div class="flex items-center gap-2">
-          <div v-if="isFetching" class="text-sm text-blue-500 flex items-center">
-            <span class="i-solar:loading-bold animate-spin mr-2"></span>
+          <div
+            v-if="isFetching"
+            class="flex items-center text-sm text-blue-500"
+          >
+            <span class="i-solar:loading-bold mr-2 animate-spin" />
             正在获取消息...
           </div>
-          <div v-else class="text-sm">
-            <span v-if="apiConfig.lastFetch > 0" class="text-gray-500">
+          <div
+            v-else
+            class="text-sm"
+          >
+            <span
+              v-if="apiConfig.lastFetch > 0"
+              class="text-gray-500"
+            >
               上次更新: {{ formatLastFetchTime(apiConfig.lastFetch) }}
             </span>
-            <span v-else class="text-gray-500">尚未获取消息</span>
+            <span
+              v-else
+              class="text-gray-500"
+            >尚未获取消息</span>
           </div>
         </div>
       </ProListItem>
-      
+
       <ProListItem
         description="立即从API获取一条消息"
         title="测试API"
       >
-        <Button 
+        <Button
           :disabled="!apiConfig.url || isFetching"
           @click="fetchApiMessage"
         >

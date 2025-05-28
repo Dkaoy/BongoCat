@@ -1,3 +1,5 @@
+import type { ScheduledReminder } from '@/composables/useScheduledReminders'
+
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -35,8 +37,12 @@ export const useBubbleStore = defineStore('bubble', () => {
     lastFetch: 0,
     messageType: 'info',
     headers: {},
-    useCustomHeaders: false
+    useCustomHeaders: false,
   })
+
+  // 定时提醒设置
+  const scheduledReminders = ref<ScheduledReminder[]>([])
+  const reminderEnabled = ref(true)
 
   // 样式设置
   const bubbleStyle = ref({
@@ -164,6 +170,8 @@ export const useBubbleStore = defineStore('bubble', () => {
     currentMessage,
     presetMessages,
     apiConfig,
+    scheduledReminders,
+    reminderEnabled,
 
     // 计算属性
     visibleMessages,
