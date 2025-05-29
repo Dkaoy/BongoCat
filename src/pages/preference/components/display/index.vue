@@ -1,31 +1,77 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { availableMonitors } from '@tauri-apps/api/window'
 import { Button, message, Select, Space, Switch } from 'ant-design-vue'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 import ProList from '@/components/pro-list/index.vue'
 import ProListItem from '@/components/pro-list-item/index.vue'
 import { useDisplayStore } from '@/stores/display'
 
-interface MonitorInfo {
-  index: number
+interface Monitor {
   name: string
   width: number
   height: number
-  x: number
-  y: number
+  index: number
 }
 
 const displayStore = useDisplayStore()
-const monitors = ref<MonitorInfo[]>([])
+const monitors = ref<Monitor[]>([])
 const loading = ref(false)
+const currentMonitorIndex = ref<number | null>(null)
+
+// 计算副屏幕可选项（排除主屏幕）
+const secondaryMonitorOptions = computed(() => {
+  return monitors.value.filter(m => m.index !== displayStore.primaryMonitor)
+    .map(m => ({ label: `${m.name} (${m.width}x${m.height})`, value: m.index }))
+})
+
+// 获取当前窗口所在的显示器索引
+async function getCurrentMonitorIndex(): Promise<number> {
+  try {
+    const appWindow = getCurrentWebviewWindow()
+    const position = await appWindow.outerPosition()
+    const monitors = await availableMonitors()
+
+    // 查找包含当前窗口位置的显示器
+    for (let i = 0; i < monitors.length; i++) {
+      const monitor = monitors[i]
+      const { position: monitorPos, size: monitorSize } = monitor
+
+      const inBoundsX = position.x >= monitorPos.x && position.x < monitorPos.x + monitorSize.width
+      const inBoundsY = position.y >= monitorPos.y && position.y < monitorPos.y + monitorSize.height
+
+      if (inBoundsX && inBoundsY) {
+        return i
+      }
+    }
+
+    // 如果没找到，默认返回主显示器（索引0）
+    return 0
+  } catch (error) {
+    console.error('获取当前显示器失败:', error)
+    return 0
+  }
+}
 
 // 获取可用显示器列表
 async function getMonitors() {
   try {
-    const monitorList = await invoke<MonitorInfo[]>('get_available_monitors')
+    const monitorList = await invoke<Monitor[]>('get_available_monitors')
     monitors.value = monitorList
-    message.success('显示器列表已更新')
+
+    // 获取当前窗口所在的显示器
+    currentMonitorIndex.value = await getCurrentMonitorIndex()
+
+    // 如果还没有设置主显示器，或者多屏显示刚启用，设置为当前显示器
+    if (displayStore.primaryMonitor === null
+      || (displayStore.multiScreenEnabled && displayStore.primaryMonitor !== currentMonitorIndex.value)) {
+      displayStore.primaryMonitor = currentMonitorIndex.value
+      // 主显示器已设置为当前显示器
+    }
+
+    // 获取到显示器列表和当前窗口位置
   } catch (error) {
     console.error('获取显示器列表失败:', error)
     message.error('获取显示器列表失败')
@@ -33,17 +79,32 @@ async function getMonitors() {
 }
 
 // 创建新的窗口实例
-async function createWindowInstance(monitorIndex: number) {
+async function createWindowInstance(monitorIndex: number, isPrimary = false) {
   loading.value = true
   try {
-    const windowId = await invoke<string>('create_window_on_monitor', { monitorIndex })
+    const windowId = await invoke<string>('create_window_on_monitor', {
+      monitorIndex,
+      isPrimary,
+    })
     displayStore.addWindowInstance(windowId)
-    message.success(`在显示器 ${monitorIndex + 1} 上创建窗口成功`)
+    const _displayType = isPrimary ? '主' : '副'
+    // 在显示器上创建窗口成功
   } catch (error) {
     console.error('创建窗口失败:', error)
-    message.error('创建窗口失败')
+    const displayType = isPrimary ? '主' : '副'
+    message.error(`创建${displayType}显示器窗口失败`)
   } finally {
     loading.value = false
+  }
+}
+
+// 关闭指定显示器上的窗口
+async function closeWindowOnMonitor(monitorIndex: number) {
+  try {
+    await invoke('close_window_on_monitor', { monitorIndex })
+    // 已关闭显示器上的窗口
+  } catch (error) {
+    console.error('关闭窗口失败:', error)
   }
 }
 
@@ -64,93 +125,72 @@ async function resetWindowPositions() {
 
 // 监听多屏显示设置变化
 watch(() => displayStore.multiScreenEnabled, async (enabled) => {
-  // 不管是开启还是关闭，先重置所有窗口状态
-  await resetWindowPositions()
-  displayStore.clearWindowInstances()
-
   if (enabled) {
-    // 确保状态被正确重置
+    // 启用多屏显示
+
+    // 获取当前窗口所在的显示器并设置为主显示器
+    const currentMonitor = await getCurrentMonitorIndex()
+    displayStore.primaryMonitor = currentMonitor
     displayStore.mainWindowOnPrimaryMonitor = false
 
-    // 如果开启多屏，先确保主显示器有窗口
-    if (displayStore.primaryMonitor !== null) {
-      try {
-        await createWindowInstance(displayStore.primaryMonitor)
-        displayStore.mainWindowOnPrimaryMonitor = true
-        message.success('主显示器窗口已创建')
-      } catch (error) {
-        console.error('创建主显示器窗口失败:', error)
-        message.error('创建主显示器窗口失败，请重试')
-      }
+    // 清空副显示器设置（如果之前设置的副显示器和主显示器相同）
+    if (displayStore.secondaryMonitor === currentMonitor) {
+      displayStore.secondaryMonitor = null
     }
 
-    // 如果有配置副显示器，也创建一个窗口
+    // 将现有主窗口移动到主显示器，而不是创建新窗口
+    try {
+      await invoke('move_main_window_to_monitor', { monitorIndex: displayStore.primaryMonitor })
+      displayStore.mainWindowOnPrimaryMonitor = true
+      message.success(`多屏显示已启用，主屏幕设置为显示器 ${currentMonitor + 1}`)
+    } catch (error) {
+      console.error('移动主窗口失败:', error)
+      message.error('启用多屏显示失败')
+    }
+
+    // 如果有配置副显示器，也创建窗口
     if (displayStore.secondaryMonitor !== null) {
       try {
-        await createWindowInstance(displayStore.secondaryMonitor)
-        message.success('副显示器窗口已创建')
+        await createWindowInstance(displayStore.secondaryMonitor, false)
       } catch (error) {
         console.error('创建副显示器窗口失败:', error)
-        message.error('创建副显示器窗口失败，请重试')
       }
     }
   } else {
-    // 关闭多屏显示时，确保主窗口在主显示器上且状态被正确重置
-    displayStore.mainWindowOnPrimaryMonitor = false
-    message.success('多屏显示已关闭，所有窗口已重置')
-  }
-})
-
-// 监听主显示器变化
-watch(() => displayStore.primaryMonitor, async (monitorIndex) => {
-  if (displayStore.multiScreenEnabled && monitorIndex !== null) {
-    // 先重置窗口位置，确保状态一致
+    // 关闭多屏显示
+    // 关闭多屏显示时，重置所有窗口
     await resetWindowPositions()
     displayStore.clearWindowInstances()
     displayStore.mainWindowOnPrimaryMonitor = false
-
-    try {
-      // 在主显示器上创建窗口
-      await createWindowInstance(monitorIndex)
-      displayStore.mainWindowOnPrimaryMonitor = true
-
-      // 如果有副显示器设置，也创建窗口
-      if (displayStore.secondaryMonitor !== null) {
-        await createWindowInstance(displayStore.secondaryMonitor)
-      }
-    } catch (error) {
-      console.error('切换主显示器失败:', error)
-      message.error('切换主显示器失败，请重试')
-    }
+    message.success('多屏显示已关闭')
   }
 })
+
+// 主显示器现在由系统自动设置，不再监听手动变化
 
 // 监听副显示器变化
 watch(() => displayStore.secondaryMonitor, async (monitorIndex, oldIndex) => {
   if (displayStore.multiScreenEnabled) {
+    // 验证不能选择主显示器
+    if (monitorIndex !== null && monitorIndex === displayStore.primaryMonitor) {
+      message.error('副显示器不能选择主显示器')
+      displayStore.secondaryMonitor = oldIndex // 恢复之前的选择
+      return
+    }
+
+    // 如果有旧的副显示器，先关闭它
+    if (oldIndex !== null && oldIndex !== monitorIndex) {
+      await closeWindowOnMonitor(oldIndex)
+    }
+
     if (monitorIndex !== null) {
       try {
-        // 只创建副显示器的新窗口，不影响主窗口
-        await createWindowInstance(monitorIndex)
+        // 创建新的副显示器窗口
+        await createWindowInstance(monitorIndex, false)
+        // 副显示器已设置
       } catch (error) {
         console.error('创建副显示器窗口失败:', error)
-        message.error('创建副显示器窗口失败，请重试')
-      }
-    } else if (oldIndex !== null) {
-      // 如果用户清除了副显示器设置，重置所有窗口并重新创建主窗口
-      await resetWindowPositions()
-      displayStore.clearWindowInstances()
-      displayStore.mainWindowOnPrimaryMonitor = false
-
-      // 如果主显示器设置有效，重新创建主显示器的窗口
-      if (displayStore.primaryMonitor !== null) {
-        try {
-          await createWindowInstance(displayStore.primaryMonitor)
-          displayStore.mainWindowOnPrimaryMonitor = true
-        } catch (error) {
-          console.error('重新创建主显示器窗口失败:', error)
-          message.error('重新创建主显示器窗口失败')
-        }
+        message.error('创建副显示器窗口失败')
       }
     }
   }
@@ -161,30 +201,41 @@ onMounted(async () => {
 
   // 如果是已启用多屏显示的情况，确保窗口状态正确
   if (displayStore.multiScreenEnabled) {
-    // 先重置所有窗口，确保状态一致
-    await resetWindowPositions()
-    displayStore.clearWindowInstances()
+    // 获取当前窗口所在的显示器并设置为主显示器
+    const currentMonitor = await getCurrentMonitorIndex()
+    const oldPrimaryMonitor = displayStore.primaryMonitor
+    displayStore.primaryMonitor = currentMonitor
 
-    // 确保主窗口在主显示器上
-    if (displayStore.primaryMonitor !== null) {
-      try {
-        await createWindowInstance(displayStore.primaryMonitor)
-        displayStore.mainWindowOnPrimaryMonitor = true
-        message.success('主显示器窗口已创建')
-      } catch (error) {
-        console.error('创建主显示器窗口失败:', error)
-        message.error('创建主显示器窗口失败')
+    // 如果主显示器发生了变化，需要重新创建窗口
+    if (oldPrimaryMonitor !== currentMonitor) {
+      // 主显示器已更新
+
+      // 先重置所有窗口，确保状态一致
+      await resetWindowPositions()
+      displayStore.clearWindowInstances()
+
+      // 如果副显示器和新的主显示器相同，清空副显示器设置
+      if (displayStore.secondaryMonitor === currentMonitor) {
+        displayStore.secondaryMonitor = null
       }
+    }
 
-      // 如果有设置副显示器，也创建窗口
-      if (displayStore.secondaryMonitor !== null) {
-        try {
-          await createWindowInstance(displayStore.secondaryMonitor)
-          message.success('副显示器窗口已创建')
-        } catch (error) {
-          console.error('创建副显示器窗口失败:', error)
-          message.error('创建副显示器窗口失败')
-        }
+    // 将现有主窗口移动到当前显示器上，而不是创建新窗口
+    try {
+      await invoke('move_main_window_to_monitor', { monitorIndex: displayStore.primaryMonitor })
+      displayStore.mainWindowOnPrimaryMonitor = true
+      // 主窗口已移动到当前显示器
+    } catch (error) {
+      console.error('移动主窗口失败:', error)
+    }
+
+    // 如果有设置副显示器，也创建窗口
+    if (displayStore.secondaryMonitor !== null && displayStore.secondaryMonitor !== displayStore.primaryMonitor) {
+      try {
+        await createWindowInstance(displayStore.secondaryMonitor, false)
+        // 副显示器窗口已创建
+      } catch (error) {
+        console.error('创建副显示器窗口失败:', error)
       }
     }
   }
@@ -199,26 +250,27 @@ onMounted(async () => {
 
     <ProListItem
       v-if="displayStore.multiScreenEnabled"
-      description="选择主要显示的屏幕"
+      description="当前小猫所在的屏幕（自动设置，不可修改）"
       title="主显示器"
     >
       <Select
         v-model:value="displayStore.primaryMonitor"
+        disabled
         :options="monitors.map(m => ({ label: `${m.name} (${m.width}x${m.height})`, value: m.index }))"
-        placeholder="选择显示器"
+        placeholder="自动检测"
         style="width: 250px"
       />
     </ProListItem>
 
     <ProListItem
       v-if="displayStore.multiScreenEnabled"
-      description="选择副显示的屏幕（可选）"
+      description="选择副显示的屏幕（可选，不能选择主屏幕）"
       title="副显示器"
     >
       <Select
         v-model:value="displayStore.secondaryMonitor"
         allow-clear
-        :options="monitors.map(m => ({ label: `${m.name} (${m.width}x${m.height})`, value: m.index }))"
+        :options="secondaryMonitorOptions"
         placeholder="选择显示器"
         style="width: 250px"
       />

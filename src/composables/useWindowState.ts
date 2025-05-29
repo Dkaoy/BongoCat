@@ -1,5 +1,6 @@
 import type { Event } from '@tauri-apps/api/event'
 
+import { invoke } from '@tauri-apps/api/core'
 import { PhysicalPosition, PhysicalSize } from '@tauri-apps/api/dpi'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { availableMonitors } from '@tauri-apps/api/window'
@@ -31,6 +32,29 @@ export function useWindowState() {
     appStore.windowState[label] ??= {}
 
     Object.assign(appStore.windowState[label], event.payload)
+
+    // 如果是多屏显示窗口，保存位置到后端
+    if (label.startsWith('monitor_')) {
+      const match = label.match(/monitor_(\d+)/)
+      if (match) {
+        const monitorIndex = Number.parseInt(match[1])
+        const { x, y, width, height } = appStore.windowState[label]
+
+        if (isNumber(x) && isNumber(y) && isNumber(width) && isNumber(height)) {
+          try {
+            await invoke('save_window_position', {
+              monitorIndex,
+              x,
+              y,
+              width,
+              height,
+            })
+          } catch (error) {
+            console.error('保存窗口位置失败:', error)
+          }
+        }
+      }
+    }
   }
 
   const restoreState = async () => {

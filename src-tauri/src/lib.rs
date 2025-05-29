@@ -3,7 +3,8 @@ mod core;
 mod utils;
 
 use commands::display::{
-    create_window_on_monitor, close_window_instance, reset_window_positions,
+    create_window_on_monitor, close_window_instance, close_window_on_monitor,
+    move_main_window_to_monitor, reset_window_positions,
     list_window_instances, get_available_monitors,
 };
 use core::{device, prevent_default, setup};
@@ -34,6 +35,8 @@ pub fn run() {
             copy_dir,
             create_window_on_monitor,
             close_window_instance,
+            close_window_on_monitor,
+            move_main_window_to_monitor,
             reset_window_positions,
             list_window_instances,
             get_available_monitors
