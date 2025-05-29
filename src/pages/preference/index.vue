@@ -7,6 +7,7 @@ import Bubble from './components/bubble/index.vue'
 import Cat from './components/cat/index.vue'
 import Display from './components/display/index.vue'
 import General from './components/general/index.vue'
+import Memory from './components/memory/index.vue'
 import Model from './components/model/index.vue'
 
 import UpdateApp from '@/components/update-app/index.vue'
@@ -49,6 +50,11 @@ const menus = [
     component: Model,
   },
   {
+    label: '内存管理',
+    icon: 'i-solar:database-bold',
+    component: Memory,
+  },
+  {
     label: '关于',
     icon: 'i-solar:info-circle-bold',
     component: About,
@@ -74,7 +80,7 @@ const menus = [
         <span class="font-bold">{{ appStore.name }}</span>
       </div>
 
-      <div class="flex flex-col gap-2">
+      <div class="scrollbar-hide flex flex-1 flex-col gap-2 overflow-auto pb-4">
         <div
           v-for="(item, index) in menus"
           :key="item.label"
@@ -105,3 +111,14 @@ const menus = [
 
   <UpdateApp />
 </template>
+
+<style scoped>
+.scrollbar-hide {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+</style>

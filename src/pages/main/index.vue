@@ -91,18 +91,7 @@ function resolveImagePath(key: string, side: 'left' | 'right' = 'left') {
   return convertFileSrc(join(modelStore.currentModel!.path, 'resources', `${side}-keys`, `${key}.png`))
 }
 
-// 在主页面加载时显示欢迎消息
-function showWelcomeMessage() {
-  setTimeout(() => {
-    bubbleStore.showInfo('你好！我是你的桌面小猫咪 🐱')
-  }, 1000)
-}
-
 onMounted(() => {
-  if (bubbleStore.enabled) {
-    showWelcomeMessage()
-  }
-
   // 如果API消息功能已启用，立即获取一条消息
   const { fetchApiMessage, startTimer } = useApiMessage()
   if (bubbleStore.enabled && bubbleStore.apiConfig.enabled && bubbleStore.apiConfig.url) {

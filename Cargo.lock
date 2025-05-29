@@ -453,6 +453,7 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tokio",
 ]
 
 [[package]]
@@ -5335,6 +5336,7 @@ dependencies = [
  "bytes",
  "libc",
  "mio 1.0.3",
+ "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",

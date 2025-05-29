@@ -22,6 +22,7 @@ export default defineConfig({
     [/^text-color-(\d+)$/, ([, d]) => `text-text-${d}`],
     [/^b-color-(\d+)$/, ([, d]) => `b-border-${d}`],
     [/^(.*)-primary-(\d+)$/, ([, s, d]) => `${s}-[var(--ant-blue-${d})]`],
+    ['scrollbar-hide', 'scrollbar-width-none [&::-webkit-scrollbar]:display-none'],
   ],
   theme: {
     colors: {

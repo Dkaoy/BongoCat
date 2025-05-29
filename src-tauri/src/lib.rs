@@ -7,7 +7,7 @@ use commands::display::{
     move_main_window_to_monitor, reset_window_positions,
     list_window_instances, get_available_monitors,
 };
-use core::{device, prevent_default, setup};
+use core::{device, memory, prevent_default, setup};
 use tauri::{generate_handler, Manager, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_custom_window::{
@@ -28,6 +28,9 @@ pub fn run() {
             setup::default(&app_handle, main_window.clone(), preference_window.clone());
 
             device::start_listening(app_handle.clone());
+            
+            // 启动内存监控
+            memory::start_memory_monitoring(app_handle.clone());
 
             Ok(())
         })
@@ -39,7 +42,9 @@ pub fn run() {
             move_main_window_to_monitor,
             reset_window_positions,
             list_window_instances,
-            get_available_monitors
+            get_available_monitors,
+            memory::get_memory_status,
+            memory::trigger_memory_cleanup
         ])
         .plugin(tauri_plugin_custom_window::init())
         .plugin(tauri_plugin_os::init())
