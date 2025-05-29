@@ -19,6 +19,9 @@ export interface ApiConfig {
   messageType: 'info' | 'success' | 'warning' | 'error'
   headers: Record<string, string>
   useCustomHeaders: boolean
+  method: 'GET' | 'POST'
+  body: string
+  useCustomBody: boolean
 }
 
 export const useBubbleStore = defineStore('bubble', () => {
@@ -33,11 +36,14 @@ export const useBubbleStore = defineStore('bubble', () => {
   const apiConfig = ref<ApiConfig>({
     enabled: false,
     url: '',
-    interval: 300000, // 5分钟
+    interval: 300, // 5分钟（秒）
     lastFetch: 0,
     messageType: 'info',
     headers: {},
     useCustomHeaders: false,
+    method: 'GET',
+    body: '',
+    useCustomBody: false,
   })
 
   // 定时提醒设置

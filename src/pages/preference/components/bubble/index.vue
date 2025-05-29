@@ -139,11 +139,14 @@ function resetToDefault() {
   // 重置API设置
   bubbleStore.apiConfig.enabled = false
   bubbleStore.apiConfig.url = ''
-  bubbleStore.apiConfig.interval = 300000
+  bubbleStore.apiConfig.interval = 300
   bubbleStore.apiConfig.lastFetch = 0
   bubbleStore.apiConfig.messageType = 'info'
   bubbleStore.apiConfig.headers = {}
   bubbleStore.apiConfig.useCustomHeaders = false
+  bubbleStore.apiConfig.method = 'GET'
+  bubbleStore.apiConfig.body = ''
+  bubbleStore.apiConfig.useCustomBody = false
 
   bubbleStore.bubbleStyle = {
     backgroundColor: '#ffffff',
@@ -703,10 +706,10 @@ function testReminder() {
       >
         <InputNumber
           v-model:value="apiConfig.interval"
-          addon-after="毫秒"
-          :max="3600000"
-          :min="60000"
-          :step="60000"
+          addon-after="秒"
+          :max="3600"
+          :min="10"
+          :step="10"
           style="width: 150px"
         />
       </ProListItem>
@@ -719,6 +722,43 @@ function testReminder() {
           v-model:value="apiConfig.messageType"
           :options="reminderTypeOptions"
           style="width: 100px"
+        />
+      </ProListItem>
+
+      <ProListItem
+        description="选择HTTP请求方法"
+        title="请求方法"
+      >
+        <Select
+          v-model:value="apiConfig.method"
+          :options="[
+            { label: 'GET', value: 'GET' },
+            { label: 'POST', value: 'POST' },
+          ]"
+          style="width: 100px"
+        />
+      </ProListItem>
+
+      <ProListItem
+        description="启用自定义请求体（仅用于POST请求）"
+        title="自定义请求体"
+      >
+        <Switch
+          v-model:checked="apiConfig.useCustomBody"
+          :disabled="apiConfig.method === 'GET'"
+        />
+      </ProListItem>
+
+      <ProListItem
+        v-if="apiConfig.useCustomBody && apiConfig.method === 'POST'"
+        description="设置POST请求的请求体内容（JSON格式）"
+        title="请求体内容"
+      >
+        <Input.TextArea
+          v-model:value="apiConfig.body"
+          placeholder="例如: {&quot;key&quot;: &quot;value&quot;}"
+          :rows="3"
+          style="width: 300px"
         />
       </ProListItem>
 
