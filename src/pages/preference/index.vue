@@ -3,7 +3,6 @@ import { Flex } from 'ant-design-vue'
 import { onMounted, ref } from 'vue'
 
 import About from './components/about/index.vue'
-import Bubble from './components/bubble/index.vue'
 import Cat from './components/cat/index.vue'
 import Display from './components/display/index.vue'
 import General from './components/general/index.vue'
@@ -28,11 +27,6 @@ const menus = [
     label: '猫咪设置',
     icon: 'i-solar:cat-bold',
     component: Cat,
-  },
-  {
-    label: '气泡框设置',
-    icon: 'i-solar:chat-round-bold',
-    component: Bubble,
   },
   {
     label: '显示设置',

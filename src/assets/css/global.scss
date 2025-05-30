@@ -51,15 +51,6 @@ html {
   object-fit: contain;
 }
 
-// 气泡框动画优化
-.bubble-container {
-  will-change: opacity, transform;
-}
-
-.bubble-message {
-  will-change: opacity, transform;
-}
-
 // 避免图片加载导致的布局变化
 img {
   display: block;
